@@ -47,3 +47,32 @@ java -cp target/KafkaStreamer-1.0-SNAPSHOT-shaded.jar com.techienotes.KafkaProdu
 java -jar target/KafkaStreamer-1.0-SNAPSHOT-shaded.jar com.techienotes.ConsumerStreamRunner
 ```
 
+## To Start Kafka in Docker
+
+### Start a cluster
+
+```bash
+docker-compose up -d
+```
+
+### Add more brokers
+
+```bash
+docker-compose scale kafka=3
+```
+
+### Stop a cluster
+
+```bash
+docker-compose stop
+```
+
+### Destroy a cluster
+
+### This will clean the volume and kafka brokers will be restarted with same broker-id
+
+```bash
+docker-compose down -v
+```
+
+
