@@ -2,7 +2,7 @@
 
 ## Kafka Commands (Perform kinit on the console before running these commands)
 
-### To reset consumer group offset to earliest 
+### To reset consumer group offset to earliest
 
 ```shell
 /usr/hdp/current/kafka/bin/kafka-consumer-groups.sh --bootstrap-server 192.168.86.140:51819 --group stream-runner-group1 --reset-offsets --to-earliest --all-topics --execute --security-protocol SASL_PLAINTEXT
@@ -38,12 +38,12 @@ export KAFKA_CLIENT_KERBEROS_PARAMS="-Djava.security.auth.login.config=jaas.conf
 ### Run producer app
 
 ```shell
-java -cp target/KafkaStreamer-1.0-SNAPSHOT-shaded.jar com.techinotes.KafkaProducerRunner
+java -cp target/KafkaStreamer-1.0-SNAPSHOT-shaded.jar com.techienotes.KafkaProducerRunner
 ```
 
 ### Run consumer app
 
 ```shell
-java -jar target/KafkaStreamer-1.0-SNAPSHOT-shaded.jar
+java -jar target/KafkaStreamer-1.0-SNAPSHOT-shaded.jar com.techienotes.ConsumerStreamRunner
 ```
 

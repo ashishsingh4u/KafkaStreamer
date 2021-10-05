@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+option java_package = "com.techinotes.protobuf";
+option java_multiple_files = true;
+
+message Technology {
+  double id = 1;
+  string name = 2;
+  string type = 3;
+  string language = 4;
+  double stars = 5;
+}
+
+message Technologies {
+  repeated Technology technologies = 1;
+}

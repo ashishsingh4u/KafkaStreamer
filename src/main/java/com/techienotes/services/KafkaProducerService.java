@@ -1,6 +1,9 @@
 package com.techienotes.services;
 
-import org.apache.kafka.clients.producer.*;
+import com.techinotes.protobuf.Technology;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,11 +26,19 @@ public class KafkaProducerService implements Runnable {
         kafkaProperties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArraySerializer");
         kafkaProperties.put(ProducerConfig.ACKS_CONFIG, "0");
         kafkaProperties.put("security.protocol", "PLAINTEXT");
-//        If Kerberos is enable then use these properties
-//        kafkaProperties.put("sasl.kerberos.service.name", "kafka");
-//        kafkaProperties.put("sasl.mechanism", "GSSAPI");
-//        kafkaProperties.put("security.protocol", "SASL_PLAINTEXT");
-//        System.setProperty("java.security.auth.login.config", "PATH_OF_JAAS");
+/*
+        kafkaProperties.put("delivery.timeout.ms", "6000");
+        kafkaProperties.put("request.timeout.ms", "5000");
+*/
+        kafkaProperties.put("max.block.ms", "5000");
+/*
+        kafkaProperties.put("batch-size", "10");
+        If Kerberos is enable then use these properties
+        kafkaProperties.put("sasl.kerberos.service.name", "kafka");
+        kafkaProperties.put("sasl.mechanism", "GSSAPI");
+        kafkaProperties.put("security.protocol", "SASL_PLAINTEXT");
+        System.setProperty("java.security.auth.login.config", "PATH_OF_JAAS");
+*/
 
         this.kafkaProducer = new KafkaProducer<String, byte[]>(kafkaProperties);
     }
@@ -49,33 +60,39 @@ public class KafkaProducerService implements Runnable {
         }
     }
 
-    private void produce() {
+    private void produce() throws Exception {
         ProducerRecord<String, byte[]> record;
 
         try {
             Random rnd = new Random();
             while (!shouldExit) {
                 for (int i = 1; i <= 10; i++) {
+                    Technology technology = Technology.newBuilder()
+                            .setId(i)
+                            .setName("machine-" + i)
+                            .setType("messageType")
+                            .setLanguage("Java")
+                            .setStars(i)
+                            .build();
+/*
                     String key = "machine-" + i;
                     String value = String.valueOf(rnd.nextInt(20));
-                    record = new ProducerRecord<>(topicName, key, value.getBytes());
+*/
+                    double key = technology.getId();
+                    byte[] value = technology.toByteArray();
+                    record = new ProducerRecord<>(topicName, Double.toString(key), value);
 
-                    kafkaProducer.send(record, new Callback() {
-                        @Override
-                        public void onCompletion(RecordMetadata recordMetadata, Exception e) {
-                            if (e != null) {
-                                logger.warn(String.format("Error sending message with key %s\n%s", key, e.getMessage()));
-                            } else {
-                                logger.warn(String.format("Partition for key-value %s::%s is %s", key, value, recordMetadata.partition()));
-                            }
+                    kafkaProducer.send(record, (recordMetadata, e) -> {
+                        if (e != null) {
+                            logger.warn(String.format("Error sending message with key-value %s::%s-->%s", key, value, e.getMessage()));
+                        } else {
+                            logger.warn(String.format("Partition for key-value %s::%s is %s", key, value, recordMetadata.partition()));
                         }
                     });
 
                     Thread.sleep(5000);
                 }
             }
-        } catch (Exception exception) {
-            logger.error("Producer thread was interrupted");
         } finally {
             kafkaProducer.close();
             logger.info("Producer closed");
