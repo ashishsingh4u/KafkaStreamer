@@ -8,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Properties;
-import java.util.Random;
 
 public class KafkaProducerService implements Runnable {
     private static final Logger logger = LoggerFactory.getLogger(KafkaProducerService.class);
@@ -16,31 +15,30 @@ public class KafkaProducerService implements Runnable {
     private final KafkaProducer<String, byte[]> kafkaProducer;
     private boolean shouldExit = false;
 
-    public KafkaProducerService(String topicName, String bootstrapCofig) {
-        logger.info(String.format("Kafka Producer running in thread %s", Thread.currentThread().getName()));
+    public KafkaProducerService(String topicName, String bootstrapConfig, boolean isKerberosEnabled) {
+        logger.info("Kafka Producer running in thread {}", Thread.currentThread().getName());
         this.topicName = topicName;
         Properties kafkaProperties = new Properties();
 
-        kafkaProperties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapCofig);
+        kafkaProperties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapConfig);
         kafkaProperties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringSerializer");
         kafkaProperties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArraySerializer");
         kafkaProperties.put(ProducerConfig.ACKS_CONFIG, "0");
         kafkaProperties.put("security.protocol", "PLAINTEXT");
-/*
-        kafkaProperties.put("delivery.timeout.ms", "6000");
-        kafkaProperties.put("request.timeout.ms", "5000");
-*/
         kafkaProperties.put("max.block.ms", "5000");
-/*
-        kafkaProperties.put("batch-size", "10");
-        If Kerberos is enable then use these properties
-        kafkaProperties.put("sasl.kerberos.service.name", "kafka");
-        kafkaProperties.put("sasl.mechanism", "GSSAPI");
-        kafkaProperties.put("security.protocol", "SASL_PLAINTEXT");
-        System.setProperty("java.security.auth.login.config", "PATH_OF_JAAS");
-*/
 
-        this.kafkaProducer = new KafkaProducer<String, byte[]>(kafkaProperties);
+        if (isKerberosEnabled) {
+            kafkaProperties.put("delivery.timeout.ms", "6000");
+            kafkaProperties.put("request.timeout.ms", "5000");
+            kafkaProperties.put("batch-size", "10");
+//          If Kerberos is enabled then use these properties
+            kafkaProperties.put("sasl.kerberos.service.name", "kafka");
+            kafkaProperties.put("sasl.mechanism", "GSSAPI");
+            kafkaProperties.put("security.protocol", "SASL_PLAINTEXT");
+            System.setProperty("java.security.auth.login.config", "PATH_OF_JAAS");
+        }
+
+        this.kafkaProducer = new KafkaProducer<>(kafkaProperties);
     }
 
     @Override
@@ -55,16 +53,16 @@ public class KafkaProducerService implements Runnable {
                 }
             });
             produce();
-        } catch (Exception exception) {
+        } catch (InterruptedException exception) {
             logger.error(exception.getMessage(), exception);
+            Thread.currentThread().interrupt();
         }
     }
 
-    private void produce() throws Exception {
-        ProducerRecord<String, byte[]> record;
+    private void produce() throws InterruptedException {
+        ProducerRecord<String, byte[]> kafkaRecord;
 
         try {
-            Random rnd = new Random();
             while (!shouldExit) {
                 for (int i = 1; i <= 10; i++) {
                     Technology technology = Technology.newBuilder()
@@ -74,19 +72,16 @@ public class KafkaProducerService implements Runnable {
                             .setLanguage("Java")
                             .setStars(i)
                             .build();
-/*
-                    String key = "machine-" + i;
-                    String value = String.valueOf(rnd.nextInt(20));
-*/
+
                     double key = technology.getId();
                     byte[] value = technology.toByteArray();
-                    record = new ProducerRecord<>(topicName, Double.toString(key), value);
+                    kafkaRecord = new ProducerRecord<>(topicName, Double.toString(key), value);
 
-                    kafkaProducer.send(record, (recordMetadata, e) -> {
+                    kafkaProducer.send(kafkaRecord, (recordMetadata, e) -> {
                         if (e != null) {
-                            logger.warn(String.format("Error sending message with key-value %s::%s-->%s", key, value, e.getMessage()));
+                            logger.warn("Error sending message with key-value {}::{}-->{}", key, value, e.getMessage());
                         } else {
-                            logger.warn(String.format("Partition for key-value %s::%s is %s", key, value, recordMetadata.partition()));
+                            logger.warn("Partition for key-value {}::{} is {}", key, value, recordMetadata.partition());
                         }
                     });
 

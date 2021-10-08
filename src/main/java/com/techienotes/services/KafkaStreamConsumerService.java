@@ -7,7 +7,6 @@ import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
-import org.apache.kafka.streams.kstream.ForeachAction;
 import org.apache.kafka.streams.kstream.KStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,9 +30,9 @@ public class KafkaStreamConsumerService {
         eventBus.unregister(service);
     }
 
-    public void init(String topicName, String groupName, String brokerConfig) {
+    public void init(String topicName, String groupName, String brokerConfig, boolean isKerberosEnabled) {
         try {
-            logger.info(String.format("Consuming entries from Kafka topic: %s and GroupId: %s", topicName, groupName));
+            logger.info("Consuming entries from Kafka topic: {} and GroupId: {}", topicName, groupName);
             Properties properties = new Properties();
             properties.put(StreamsConfig.APPLICATION_ID_CONFIG, groupName);
             properties.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, brokerConfig);
@@ -44,21 +43,19 @@ public class KafkaStreamConsumerService {
             properties.put("heartbeat.interval.ms", "2000");
             properties.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
             properties.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
-//            If kerberos security is enabled
-//            properties.put(StreamsConfig.SECURITY_PROTOCOL_CONFIG, "SASL_PLAINTEXT");
-//            properties.put("sasl.kerberos.service.name", "kafka");
-//            properties.put("sasl.mechanism", "GSSAPI");
-//            System.setProperty("java.security.auth.login.config", "PATH_OF_JAAS");
+
+//          Kerberos related properties
+            if (isKerberosEnabled) {
+                properties.put(StreamsConfig.SECURITY_PROTOCOL_CONFIG, "SASL_PLAINTEXT");
+                properties.put("sasl.kerberos.service.name", "kafka");
+                properties.put("sasl.mechanism", "GSSAPI");
+                System.setProperty("java.security.auth.login.config", "PATH_OF_JAAS");
+            }
 
             final StreamsBuilder builder = new StreamsBuilder();
 
             KStream<String, byte[]> stream = builder.stream(topicName);
-            stream.foreach(new ForeachAction<String, byte[]>() {
-                @Override
-                public void apply(String key, byte[] value) {
-                    eventBus.post(new KafkaEvent(key, value));
-                }
-            });
+            stream.foreach((key, value) -> eventBus.post(new KafkaEvent(key, value)));
 
             final Topology topology = builder.build();
             final KafkaStreams streams = new KafkaStreams(topology, properties);
@@ -73,18 +70,19 @@ public class KafkaStreamConsumerService {
                 }
             });
 
-            try {
-                streams.start();
-                logger.info("Streaming started");
-                latch.await();
-                logger.info("Latch Await Completed");
-                logger.info("Streaming Completed");
-            } catch (Throwable throwable) {
-                System.exit(1);
-            }
-        } catch (Exception exception) {
-            exception.printStackTrace();
+            startStream(streams, latch);
+        } catch (InterruptedException exception) {
+            logger.error("Stream crashed", exception);
             logger.error("Exception occured while starting KafkaStreams");
+            Thread.currentThread().interrupt();
         }
+    }
+
+    private void startStream(KafkaStreams streams, CountDownLatch latch) throws InterruptedException {
+        streams.start();
+        logger.info("Streaming started");
+        latch.await();
+        logger.info("Latch Await Completed");
+        logger.info("Streaming Completed");
     }
 }

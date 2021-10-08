@@ -22,10 +22,8 @@ public class ConsumerStreamRunner {
             } catch (InvalidProtocolBufferException e) {
                 logger.error("Exception occured while converting proto byte to object", e);
             }
-
-//                logger.info(String.format("Key: %s, Value: %s", kafkaEvent.getKey(), kafkaEvent.getValue()));
         });
 
-        service.init(topicName, groupName, brokerConfig);
+        service.init(topicName, groupName, brokerConfig, false);
     }
 }

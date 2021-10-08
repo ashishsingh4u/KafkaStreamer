@@ -12,7 +12,7 @@ public class KafkaProducerRunner {
         String topicName = "tech-topic";
         String brokerConfig = "192.168.86.140:51351";
 
-        new Thread(new KafkaProducerService(topicName, brokerConfig)).start();
+        new Thread(new KafkaProducerService(topicName, brokerConfig, false)).start();
         logger.info("Kafka Producer Started");
     }
 }
